@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const dotenv = require('dotenv');
+dotenv.config();
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -10,38 +11,34 @@ module.exports = {
                 .setDescription('Stock Ticker')
                 .setRequired(true)
         ),
-    async execute(interaction) {
-        const ticker = interaction.options.getString('ticker');
-        const url = process.env.API_URL + 'function=TIME_SERIES_INTRADAY' +
-            '&symbol=' + ticker + '&interval=5min' + '&apikey=' + process.env.API_KEY;
+    async execute(interaction, db) {
+        const sql = 'SELECT * FROM stocks WHERE symbol = \'' + interaction.options.getString('ticker') + '\'' + ' ORDER BY name';
 
-        const res = await fetch(url);
+        db.query(sql, function (err, result) {
+            if (err) throw err;
+            console.log(result);
+            if (result.length != 0) {
+                const time = result[0]['time'];
+                const company = result[0]['name'];
+                const symbol = result[0]['symbol'];
+                const price = '$' + result[0]['price'];
+                const volume = result[0]['volume'];
 
-        if (res) {
-            const data = await res.json()
-            const time = data['Meta Data']['3. Last Refreshed']
-            const symbol = data['Meta Data']['2. Symbol']
-            const price = '$' + data['Time Series (5min)'][time]['4. close'];
-            const volume = data['Time Series (5min)'][time]['5. volume'];
-            console.log(time);
-            console.log(symbol);
-            console.log(price);
-
-            const embed = new EmbedBuilder()
+                const embed = new EmbedBuilder()
                 .setColor(0x0099FF)
-                .setTitle(symbol)
+                .setTitle(company)
+                .setDescription('Ticker Symbol: ' + symbol)
                 .setAuthor({ name: 'Stock Detail' })
                 .addFields(
                     { name: 'Last Traded Stock Price', value: price },
-                    { name: 'Volume (Last 5 min interval)', value: volume },
+                    { name: 'Volume (Per 1 min interval)', value: volume },
                 )
                 .setFooter({ text: 'Last Updated: ' + time });
-                await interaction.reply({ embeds: [embed] });
-        }
-        else {
-            await interaction.reply('The ticker is not valid.');
-        }
-
-
+                interaction.reply({ embeds: [embed] });
+            }
+            else {
+                interaction.reply("The ticker is invalid.");
+            }
+        });
     },
 };
