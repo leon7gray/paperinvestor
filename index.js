@@ -3,7 +3,11 @@ const path = require('node:path');
 const mysql = require('mysql2');
 const { Client, GatewayIntentBits, Collection } = require('discord.js');
 const dotenv = require('dotenv');
+const WebSocket = require('ws');
 dotenv.config();
+
+//WEBSOCKET
+const ws = new WebSocket('wss://stream.data.alpaca.markets/v2/iex');
 
 //CLIENT
 const client = new Client({
@@ -58,5 +62,36 @@ for (const file of eventFiles) {
 
 console.log(client.commands);
 
+ws.on('open', function open() {
+    console.log('Connected to WebSocket server');
+    const authData = { "action": "auth", "key": process.env.ALPACA_API_KEY, "secret": process.env.ALPACA_API_SECRET };
+    // Send a message to the server
+    console.log(authData);
+    ws.send(JSON.stringify(authData));
+    const subscription = { "action": "subscribe", "bars": ["AAPL", "SPY", "AMD", "TSLA", "NVDA", "META", "MSFT"] };
+    ws.send(JSON.stringify(subscription));
+});
+
+ws.on('message', function incoming(data) {
+    const data1 = JSON.parse(data.toString());
+    data1.forEach(stock => {
+        const date = new Date(stock.t);
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const year = date.getFullYear();
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        const seconds = String(date.getSeconds()).padStart(2, '0');
+
+        const formattedDate = `${month}/${day}/${year} ${hours}:${minutes}:${seconds}`;
+        const sql = `UPDATE stocks SET price = '${stock.c}', volume = '${stock.v}', time = '${formattedDate}' WHERE symbol = '${stock.S}'`;
+        db.query(sql);
+    });
+    console.log(data1);
+});
+
+ws.on('close', function close() {
+    console.log('Disconnected from WebSocket server');
+});
 
 client.login(process.env.DISCORD_TOKEN);

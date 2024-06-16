@@ -14,7 +14,7 @@ module.exports = {
             if (err) throw err;
             console.log(result);
             if (result.length != 0) {
-                const stockList = result.map(stock => `${stock.symbol.padEnd(6)} | ${stock.name}`).join('\n');
+                const stockList = result.map(stock =>`${stock.symbol.padEnd(6)} | ${stock.name}`).join('\n');
                 const embed = new EmbedBuilder()
                     .setColor(0x0099FF)
                     .setTitle("Supported Stocks")

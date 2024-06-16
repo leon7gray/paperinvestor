@@ -9,22 +9,64 @@ module.exports = {
         .setDescription('View portfolio'),
     async execute(interaction, db) {
         const user = interaction.user.id;
-
+        const userSQL = `SELECT * FROM users WHERE user = ${user}`;
+        db.query(userSQL, function (err, userExist) {
+            if (userExist.length == 0) {
+                db.query(`INSERT INTO users (user, balance) VALUES ('${user}', '0')`);
+            }
+        });
         const sql = 'SELECT symbol, SUM(amount) AS total_amount, SUM(total) AS total_balance FROM transactions GROUP BY symbol';
         db.query(sql, function (err, portfolio) {
             if (err) throw err;
 
             if (portfolio) {
-                console.log(portfolio);
-                const stockList = portfolio
-                .filter(stock => stock.total_amount > 0)
-                console.log(stockList);
+                const stockList = portfolio.filter(stock => stock.total_amount > 0);
                 const symbols = stockList.map(stock => stock.symbol);
+                if (symbols.length == 0) {
+                    db.query(userSQL, function (err, userProfile) {
+                        const date = new Date();
+                        const embed = new EmbedBuilder()
+                            .setColor(0x0099FF)
+                            .setTitle('Portfolio')
+                            .setFooter({ text: 'As of ' + date.toString() })
+                            .addFields({ name: 'User: ', value: '<@' + user + '>', inline: true })
+                            .addFields({ name: 'Balance', value: userProfile[0].balance })
+                            .addFields({ name: `You do not own any stocks.`, value: ' ' });
+
+                        interaction.reply({ embeds: [embed] });
+                        return
+                    });
+                }
+                else {
+                    const priceSQL = `SELECT * FROM stocks WHERE symbol IN (?)`;
+                    db.query(priceSQL, [symbols], function (err, prices) {
+                        if (err) throw err;
+                        db.query(userSQL, function (err, userProfile) {
+                            const priceMap = new Map();
+                            prices.forEach((stock) => priceMap[stock.symbol] = stock.price);
+                            const result = stockList
+                                .map(stock => `${stock.symbol.padEnd(6)} |      ${stock.total_amount} shares        |      $${stock.total_balance} invested     |      ${((priceMap[stock.symbol] - (stock.total_balance / stock.total_amount)) / (stock.total_balance / stock.total_amount)).toFixed(2)}%`).join('\n');
+
+                            const date = new Date();
+                            const embed = new EmbedBuilder()
+                                .setColor(0x0099FF)
+                                .setTitle('Portfolio')
+                                .setFooter({ text: 'As of ' + date.toString() })
+                                .addFields({ name: 'User: ', value: '<@' + user + '>', inline: true })
+                                .addFields({ name: 'Balance', value: userProfile[0].balance })
+                                .addFields({ name: `${result}`, value: ' ' });
+
+                            interaction.reply({ embeds: [embed] });
+                        });
+
+                    });
+                }
+
                 /*
                 .map(stock => `${stock.symbol.padEnd(6)} | ${stock.total_amount} shares | $${stock.total_balance} invested`)
                 .join('\n');
                 */
-                
+
                 /*
                 const total = Number(quantity) * Number(price);
                 db.query(`SELECT * FROM users WHERE user = '${user}'`, function (err, result) {

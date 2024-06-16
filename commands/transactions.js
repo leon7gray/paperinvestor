@@ -21,7 +21,7 @@ module.exports = {
                 .setColor(0x0099FF)
                 .setTitle('Transactions')
                 .setFooter({ text: 'As of ' + date.toString() })
-                .addFields({name: `${transactionList}`, value: ' '});
+                .addFields({name: `${transactionList} `, value: ' '});
             interaction.channel.send(`<@${user}>`);
             interaction.reply({ embeds: [embed] });
         });
